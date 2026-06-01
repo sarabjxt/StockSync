@@ -148,22 +148,21 @@ export function CustomerCombobox({
                         : item.phone || item.email || "No contact info"}
                     </span>
                   </div>
+                  {!isCreate && creditNum !== 0 && (
+                    <span
+                      className={cn(
+                        "text-[10px] px-1.5 py-0.5 rounded-full font-semibold tabular-nums ml-1 shrink-0 border",
+                        creditNum > 0
+                          ? "bg-primary/10 text-primary-foreground! border-primary/20"
+                          : "bg-warning/10 text-warning! border-warning/20"
+                      )}
+                    >
+                      {creditNum > 0
+                        ? `Credit: ${formatMoney(creditNum)}`
+                        : `Owes: ${formatMoney(Math.abs(creditNum))}`}
+                    </span>
+                  )}
                 </div>
-
-                {!isCreate && creditNum !== 0 && (
-                  <span
-                    className={cn(
-                      "text-xs px-2 py-0.5 rounded-full font-bold tabular-nums ml-auto shrink-0 border",
-                      creditNum > 0
-                        ? "bg-primary/30 text-primary-foreground border-primary/20"
-                        : "bg-warning/10 text-warning border-warning/20"
-                    )}
-                  >
-                    {creditNum > 0
-                      ? `Credit: ${formatMoney(creditNum)}`
-                      : `Owes: ${formatMoney(Math.abs(creditNum))}`}
-                  </span>
-                )}
               </ComboboxItem>
             )
           }}

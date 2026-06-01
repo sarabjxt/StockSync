@@ -482,8 +482,8 @@ function QuickAdjustSheetImpl({
 
                 {/* DYNAMIC SECTION: Only show if it's a SALE or RETURN */}
                 {(type === "SALE" || type === "RETURN") && (
-                  <div className="space-y-4 p-4.5 border border-border rounded-xl bg-muted/20 text-left transition-all duration-300">
-                    <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-4 text-left transition-all duration-300">
+                    <div className="grid grid-cols-1 gap-4">
                       <form.Field
                         name="customerId"
                         children={(field) => {
