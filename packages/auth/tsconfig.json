@@ -1,0 +1,7 @@
+{
+  "extends": ["@stocksync/typescript-config/base.json"],
+  "compilerOptions": {
+    "jsx": "react",
+    "types": ["node"]
+  }
+}

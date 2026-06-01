@@ -1,0 +1,29 @@
+{
+  "name": "@stocksync/trpc",
+  "version": "1.0.0",
+  "description": "",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {},
+  "dependencies": {
+    "@stocksync/auth": "workspace:*",
+    "@stocksync/db": "workspace:*",
+    "@trpc/server": "^11.16.0",
+    "better-auth": "^1.6.9",
+    "date-fns": "^4.3.0",
+    "drizzle-orm": "^0.45.2",
+    "postgres": "^3.4.9",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@stocksync/eslint-config": "workspace:*",
+    "@stocksync/typescript-config": "workspace:*",
+    "@types/node": "^25.6.0",
+    "tsx": "^4.21.0"
+  },
+  "license": "ISC"
+}

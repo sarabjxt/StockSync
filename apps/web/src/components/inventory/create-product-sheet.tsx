@@ -1,0 +1,72 @@
+import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { Dialog as SheetPrimitive } from "@base-ui/react/dialog"
+
+import { toast } from "sonner"
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
+import { handleTrpcError, trpc } from "@/lib/trpc"
+import { CategoryDialog } from "@/components/inventory/category-dialog"
+import { ProductForm } from "@/components/inventory/product-form"
+
+const productSheet = SheetPrimitive.createHandle()
+
+export function CreateProductSheet(
+  props: Omit<React.ComponentProps<typeof Sheet>, "handle" | "children">
+) {
+  const queryClient = useQueryClient()
+
+  const createProduct = useMutation(
+    trpc.product.create.mutationOptions({
+      onSuccess: () => {
+        toast.success("Product created successfully.")
+
+        queryClient.invalidateQueries({
+          queryKey: trpc.product.list.queryKey(),
+        })
+
+        productSheet.close()
+      },
+      onError: (error) => {
+        handleTrpcError(error)
+      },
+    })
+  )
+
+  return (
+    <>
+      <Sheet {...props} handle={productSheet}>
+        <SheetContent className="data-[side=right]:sm:max-w-lg">
+          <SheetHeader className="md:gap-1">
+            <SheetTitle className="text-lg">New Product</SheetTitle>
+            <SheetDescription>
+              Enter the details of the new product here. Click save when you're
+              done.
+            </SheetDescription>
+          </SheetHeader>
+          <ProductForm
+            onSubmit={async (values) => {
+              await createProduct.mutateAsync({
+                ...values,
+                categoryId: values.category?.id,
+              })
+            }}
+            isSubmitting={createProduct.isPending}
+          />
+        </SheetContent>
+      </Sheet>
+      <CategoryDialog />
+    </>
+  )
+}
+
+export function CreateProductSheetTrigger(
+  props: React.ComponentProps<typeof SheetTrigger>
+) {
+  return <SheetTrigger {...props} handle={productSheet} />
+}
