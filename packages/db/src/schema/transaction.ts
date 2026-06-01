@@ -25,6 +25,7 @@ export const transaction = pgTable("transaction", {
   type: varchar("type", { length: 50 }).notNull(), // 'SALE', 'RESTOCK', 'DAMAGE', 'RETURN', 'PAYMENT'
   totalAmount: numeric("total_amount", { precision: 10, scale: 2 }).notNull(),
   profit: numeric("profit", { precision: 10, scale: 2 }),
+  amountPaid: numeric("amount_paid", { precision: 10, scale: 2 }),
 
   // Tracks if this specific receipt was paid for or added to Udhar
   paymentStatus: varchar("payment_status", { length: 50 })

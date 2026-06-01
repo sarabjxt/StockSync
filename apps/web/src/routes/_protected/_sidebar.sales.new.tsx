@@ -4,6 +4,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Check, History, Minus, Plus, ShoppingBag, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { format } from "date-fns"
+import { useForm, useStore } from "@tanstack/react-form"
+import { z } from "zod"
 import { trpc } from "@/lib/trpc"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -33,6 +35,13 @@ import {
   FieldTitle,
 } from "@/components/ui/field"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 export const Route = createFileRoute("/_protected/_sidebar/sales/new")({
   component: RouteComponent,
@@ -46,17 +55,6 @@ type LineItem = {
 
 function RouteComponent() {
   const queryClient = useQueryClient()
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(
-    null
-  )
-  const [notes, setNotes] = useState("")
-  const [paymentMethod, setPaymentMethod] = useState<"CASH" | "CARD" | "UPI">(
-    "CASH"
-  )
-
-  const [items, setItems] = useState<Array<LineItem>>([
-    { id: crypto.randomUUID(), productId: null, quantity: 1 },
-  ])
 
   const { data: products = [] } = useQuery(trpc.product.list.queryOptions())
   const { data: recentSales = [], isLoading: isLoadingRecentSales } = useQuery(
@@ -67,10 +65,7 @@ function RouteComponent() {
     trpc.transaction.createSale.mutationOptions({
       onSuccess: () => {
         toast.success("Sale completed successfully!")
-        setItems([{ id: crypto.randomUUID(), productId: null, quantity: 1 }])
-        setSelectedCustomerId(null)
-        setNotes("")
-        setPaymentMethod("CASH")
+        form.reset()
         queryClient.invalidateQueries({
           queryKey: trpc.product.list.queryKey(),
         })
@@ -87,25 +82,114 @@ function RouteComponent() {
     })
   )
 
-  const addLineItem = () => {
-    setItems((prev) => [
-      ...prev,
-      { id: crypto.randomUUID(), productId: null, quantity: 1 },
-    ])
-  }
+  const saleFormSchema = useMemo(() => {
+    return z
+      .object({
+        customerId: z.uuid().nullable(),
+        paymentStatus: z.enum(["PAID", "UNPAID", "PARTIAL"]),
+        amountPaid: z.number().nonnegative(),
+        paymentMethod: z.enum(["CASH", "CARD", "UPI"]),
+        notes: z.string(),
+        items: z
+          .array(
+            z.object({
+              id: z.string(),
+              productId: z.string().uuid().nullable(),
+              quantity: z.number().int().positive(),
+            })
+          )
+          .min(1, "Please add at least one item"),
+      })
+      .superRefine((data, ctx) => {
+        if (
+          (data.paymentStatus === "UNPAID" ||
+            data.paymentStatus === "PARTIAL") &&
+          !data.customerId
+        ) {
+          ctx.addIssue({
+            code: "custom",
+            message:
+              "A customer must be selected for unpaid (Udhar) or partial sales.",
+            path: ["customerId"],
+          })
+        }
 
-  const updateLineItem = (id: string, updates: Partial<LineItem>) => {
-    setItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, ...updates } : item))
-    )
-  }
+        if (data.paymentStatus === "PARTIAL") {
+          if (data.amountPaid <= 0) {
+            ctx.addIssue({
+              code: "custom",
+              message: "Amount paid must be greater than 0.",
+              path: ["amountPaid"],
+            })
+          }
 
-  const removeLineItem = (id: string) => {
-    setItems((prev) => prev.filter((item) => item.id !== id))
-  }
+          const validItems = data.items.filter(
+            (item) => item.productId !== null
+          )
+          const total = validItems.reduce((acc, item) => {
+            const prod = products.find((p) => p.id === item.productId)
+            return acc + (prod ? Number(prod.sellingPrice) * item.quantity : 0)
+          }, 0)
 
-  // Derived values
-  const validItems = items.filter((item) => item.productId !== null)
+          if (data.amountPaid >= total) {
+            ctx.addIssue({
+              code: "custom",
+              message: `Amount paid must be less than the total cart amount (${formatMoney(total)}).`,
+              path: ["amountPaid"],
+            })
+          }
+        }
+      })
+  }, [products])
+
+  const defaultValues = useMemo<z.infer<typeof saleFormSchema>>(() => ({
+    customerId: null,
+    paymentStatus: "PAID",
+    amountPaid: 0,
+    paymentMethod: "CASH",
+    notes: "",
+    items: [
+      {
+        id: crypto.randomUUID(),
+        productId: null,
+        quantity: 1,
+      },
+    ],
+  }), [])
+
+  const form = useForm({
+    defaultValues,
+    validators: { onChange: saleFormSchema },
+    onSubmit: async ({ value }) => {
+      const validItems = value.items.filter((item) => item.productId !== null)
+      if (validItems.length === 0) {
+        toast.error("Please add at least one valid product.")
+        return
+      }
+
+      await createSale.mutateAsync({
+        customerId: value.customerId || undefined,
+        items: validItems.map((item) => ({
+          productId: item.productId as string,
+          quantity: item.quantity,
+        })),
+        paymentStatus: value.paymentStatus,
+        amountPaid:
+          value.paymentStatus === "PARTIAL" ? value.amountPaid : undefined,
+        paymentMethod:
+          value.paymentStatus !== "UNPAID" ? value.paymentMethod : undefined,
+        notes: value.notes || undefined,
+      })
+    },
+  })
+
+  // Subscribe to changes to compute derived state reactively
+  const items = useStore(form.store, (state) => state.values.items)
+
+  const validItems = useMemo(
+    () => items.filter((item) => item.productId !== null),
+    [items]
+  )
 
   const cartTotal = useMemo(() => {
     return validItems.reduce((total, item) => {
@@ -114,24 +198,6 @@ function RouteComponent() {
       return total + Number(product.sellingPrice) * item.quantity
     }, 0)
   }, [validItems, products])
-
-  const handleCheckout = () => {
-    if (validItems.length === 0) {
-      toast.error("Please add at least one valid product.")
-      return
-    }
-
-    createSale.mutate({
-      customerId: selectedCustomerId || undefined,
-      items: validItems.map((item) => ({
-        productId: item.productId as string,
-        quantity: item.quantity,
-      })),
-      paymentStatus: "PAID",
-      paymentMethod,
-      notes,
-    })
-  }
 
   return (
     <div className="max-w-4xl flex flex-col gap-6 pb-12">
@@ -143,132 +209,289 @@ function RouteComponent() {
       </div>
 
       <Card className="shadow-sm overflow-hidden">
-        <CardContent className="space-y-6">
-          <Field className="max-w-md">
-            <FieldLabel htmlFor="pos-customer-combobox">
-              Select Customer
-            </FieldLabel>
-            <CustomerCombobox
-              id="pos-customer-combobox"
-              value={selectedCustomerId}
-              onValueChange={setSelectedCustomerId}
-              placeholder="Walk-in Customer (Guest)"
-            />
-          </Field>
-          <Field>
-            <FieldLabel>Line Items</FieldLabel>
-            <div className="flex flex-col gap-4">
-              {items.map((item, index) => (
-                <LineItemRow
-                  key={item.id}
-                  index={index}
-                  item={item}
-                  products={products}
-                  onUpdate={(updates) => updateLineItem(item.id, updates)}
-                  onRemove={() => removeLineItem(item.id)}
-                />
-              ))}
-              {items.length > 0 && (
-                <Button
-                  variant="outline"
-                  onClick={addLineItem}
-                  className="ml-10 w-fit"
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            form.handleSubmit()
+          }}
+        >
+          <CardContent className="space-y-6">
+            <form.Field
+              name="customerId"
+              children={(field) => (
+                <Field
+                  className="max-w-md"
+                  data-invalid={field.state.meta.errors.length > 0}
                 >
-                  <Plus />
-                  Add Item
-                </Button>
+                  <FieldLabel htmlFor="pos-customer-combobox">
+                    Select Customer
+                  </FieldLabel>
+                  <CustomerCombobox
+                    id="pos-customer-combobox"
+                    value={field.state.value}
+                    onValueChange={(val) => field.handleChange(val)}
+                    placeholder="Walk-in Customer (Guest)"
+                  />
+                  {field.state.meta.errors.length > 0 && (
+                    <p className="text-xs text-destructive mt-1 font-medium">
+                      {field.state.meta.errors.join(", ")}
+                    </p>
+                  )}
+                </Field>
               )}
-              {items.length === 0 && (
-                <div className="p-8 text-center text-muted-foreground flex flex-col items-center gap-2">
-                  <ShoppingBag className="size-8 opacity-50 mb-2" />
-                  <p>No items added to invoice.</p>
-                  <Button
-                    variant="outline"
-                    onClick={addLineItem}
-                    className="mt-2"
-                  >
-                    Add an item
-                  </Button>
-                </div>
-              )}
-            </div>
-          </Field>
-          {/* Notes & Payment Method Section */}
-          <Field>
-            <FieldLabel>Payment Method</FieldLabel>
-            <RadioGroup
-              value={paymentMethod}
-              onValueChange={(val) => setPaymentMethod(val)}
-              className="flex flex-col sm:flex-row w-full"
-            >
-              <FieldLabel htmlFor="cash">
-                <Field orientation="horizontal">
-                  <FieldContent>
-                    <FieldTitle>Cash</FieldTitle>
-                  </FieldContent>
-                  <RadioGroupItem value="CASH" id="cash" />
-                </Field>
-              </FieldLabel>
-
-              <FieldLabel htmlFor="card">
-                <Field orientation="horizontal">
-                  <FieldContent>
-                    <FieldTitle>Card</FieldTitle>
-                  </FieldContent>
-                  <RadioGroupItem value="CARD" id="card" />
-                </Field>
-              </FieldLabel>
-              <FieldLabel htmlFor="upi">
-                <Field orientation="horizontal">
-                  <FieldContent>
-                    <FieldTitle>UPI</FieldTitle>
-                  </FieldContent>
-                  <RadioGroupItem value="UPI" id="upi" />
-                </Field>
-              </FieldLabel>
-            </RadioGroup>
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="transaction-notes">
-              Transaction Notes
-            </FieldLabel>
-            <Textarea
-              id="transaction-notes"
-              placeholder="Any additional info..."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="min-h-20 max-w-md"
             />
-          </Field>
 
-          {/* Total & Checkout Section */}
-          <div className="w-full max-w-md flex flex-col gap-2 items-end">
-            <div className="flex justify-between items-baseline w-full">
-              <span className="font-medium font-heading text-lg">Total</span>
-              <span className="font-bold text-2xl tabular-nums">
-                {formatMoney(cartTotal)}
-              </span>
-            </div>
-            <Button
-              size="lg"
-              className="w-full mt-2 font-medium"
-              onClick={handleCheckout}
-              disabled={validItems.length === 0 || createSale.isPending}
-            >
-              {createSale.isPending ? (
-                <>
-                  <Spinner />
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <Check className="size-4" />
-                  Record Sale
-                </>
+            <form.Field
+              name="items"
+              mode="array"
+              children={(itemsField) => (
+                <Field>
+                  <FieldLabel>Line Items</FieldLabel>
+                  <div className="flex flex-col gap-4">
+                    {itemsField.state.value.map((item, index) => (
+                      <LineItemRow
+                        key={item.id}
+                        index={index}
+                        item={item}
+                        products={products}
+                        onUpdate={(updates) => {
+                          const current = [...itemsField.state.value]
+                          current[index] = { ...current[index], ...updates }
+                          itemsField.handleChange(current)
+                        }}
+                        onRemove={() => itemsField.removeValue(index)}
+                      />
+                    ))}
+                    {itemsField.state.value.length > 0 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() =>
+                          itemsField.pushValue({
+                            id: crypto.randomUUID(),
+                            productId: null,
+                            quantity: 1,
+                          })
+                        }
+                        className="ml-10 w-fit"
+                      >
+                        <Plus />
+                        Add Item
+                      </Button>
+                    )}
+                    {itemsField.state.value.length === 0 && (
+                      <div className="p-8 text-center text-muted-foreground flex flex-col items-center gap-2">
+                        <ShoppingBag className="size-8 opacity-50 mb-2" />
+                        <p>No items added to invoice.</p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() =>
+                            itemsField.pushValue({
+                              id: crypto.randomUUID(),
+                              productId: null,
+                              quantity: 1,
+                            })
+                          }
+                          className="mt-2"
+                        >
+                          Add an item
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </Field>
               )}
-            </Button>
-          </div>
-        </CardContent>
+            />
+
+            <form.Field
+              name="paymentStatus"
+              children={(field) => (
+                <Field className="max-w-md">
+                  <FieldLabel htmlFor="payment-status-select">
+                    Payment Status
+                  </FieldLabel>
+                  <Select
+                    id="payment-status-select"
+                    value={field.state.value}
+                    onValueChange={(val: any) => {
+                      field.handleChange(val)
+                      form.setFieldValue("amountPaid", 0)
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select payment status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="PAID">Paid in Full</SelectItem>
+                      <SelectItem value="UNPAID">
+                        Add to Udhar (Unpaid)
+                      </SelectItem>
+                      <SelectItem value="PARTIAL">Partial Payment</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+              )}
+            />
+
+            <form.Subscribe
+              selector={(state) => [state.values.paymentStatus]}
+              children={([status]) => {
+                if (status !== "PARTIAL") return null
+                return (
+                  <form.Field
+                    name="amountPaid"
+                    children={(field) => {
+                      const hasError = field.state.meta.errors.length > 0
+                      return (
+                        <Field className="max-w-md" data-invalid={hasError}>
+                          <FieldLabel htmlFor="amount-paid-input">
+                            Amount Paid
+                          </FieldLabel>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                              ₹
+                            </span>
+                            <Input
+                              id="amount-paid-input"
+                              type="number"
+                              placeholder="0.00"
+                              value={field.state.value || ""}
+                              onChange={(e) =>
+                                field.handleChange(Number(e.target.value) || 0)
+                              }
+                              className={cn(
+                                "pl-7",
+                                hasError &&
+                                  "border-destructive focus-visible:ring-destructive"
+                              )}
+                            />
+                          </div>
+                          {hasError ? (
+                            <p className="text-xs text-destructive mt-1 font-medium">
+                              {field.state.meta.errors.join(", ")}
+                            </p>
+                          ) : (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Remaining debt of{" "}
+                              {formatMoney(cartTotal - field.state.value)} will
+                              be added to the customer's Udhar balance.
+                            </p>
+                          )}
+                        </Field>
+                      )
+                    }}
+                  />
+                )
+              }}
+            />
+
+            <form.Subscribe
+              selector={(state) => [state.values.paymentStatus]}
+              children={([status]) => {
+                if (status === "UNPAID") return null
+                return (
+                  <form.Field
+                    name="paymentMethod"
+                    children={(field) => (
+                      <Field>
+                        <FieldLabel>Payment Method</FieldLabel>
+                        <RadioGroup
+                          value={field.state.value}
+                          onValueChange={(val: any) => field.handleChange(val)}
+                          className="flex flex-col sm:flex-row w-full"
+                        >
+                          <FieldLabel htmlFor="cash">
+                            <Field orientation="horizontal">
+                              <FieldContent>
+                                <FieldTitle>Cash</FieldTitle>
+                              </FieldContent>
+                              <RadioGroupItem value="CASH" id="cash" />
+                            </Field>
+                          </FieldLabel>
+
+                          <FieldLabel htmlFor="card">
+                            <Field orientation="horizontal">
+                              <FieldContent>
+                                <FieldTitle>Card</FieldTitle>
+                              </FieldContent>
+                              <RadioGroupItem value="CARD" id="card" />
+                            </Field>
+                          </FieldLabel>
+                          <FieldLabel htmlFor="upi">
+                            <Field orientation="horizontal">
+                              <FieldContent>
+                                <FieldTitle>UPI</FieldTitle>
+                              </FieldContent>
+                              <RadioGroupItem value="UPI" id="upi" />
+                            </Field>
+                          </FieldLabel>
+                        </RadioGroup>
+                      </Field>
+                    )}
+                  />
+                )
+              }}
+            />
+
+            <form.Field
+              name="notes"
+              children={(field) => (
+                <Field>
+                  <FieldLabel htmlFor="transaction-notes">
+                    Transaction Notes
+                  </FieldLabel>
+                  <Textarea
+                    id="transaction-notes"
+                    placeholder="Any additional info..."
+                    value={field.state.value}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    className="min-h-20 max-w-md"
+                  />
+                </Field>
+              )}
+            />
+
+            {/* Total & Checkout Section */}
+            <div className="w-full max-w-md flex flex-col gap-2 items-end">
+              <div className="flex justify-between items-baseline w-full">
+                <span className="font-medium font-heading text-lg">Total</span>
+                <span className="font-bold text-2xl tabular-nums">
+                  {formatMoney(cartTotal)}
+                </span>
+              </div>
+              <form.Subscribe
+                selector={(state) => [state.canSubmit, state.isSubmitting]}
+                children={([canSubmit, isSubmitting]) => (
+                  <Button
+                    size="lg"
+                    className="w-full mt-2 font-medium"
+                    type="submit"
+                    disabled={
+                      validItems.length === 0 ||
+                      createSale.isPending ||
+                      !canSubmit ||
+                      isSubmitting
+                    }
+                  >
+                    {createSale.isPending || isSubmitting ? (
+                      <>
+                        <Spinner />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <Check className="size-4" />
+                        Record Sale
+                      </>
+                    )}
+                  </Button>
+                )}
+              />
+            </div>
+          </CardContent>
+        </form>
       </Card>
 
       {/* Recent Sales History */}
@@ -495,7 +718,7 @@ function LineItemRow({
           </span>
         </div>
 
-        <Button variant="ghost" size="icon" onClick={onRemove}>
+        <Button type="button" variant="ghost" size="icon" onClick={onRemove}>
           <Trash2 className="size-4" />
         </Button>
       </div>

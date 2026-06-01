@@ -15,6 +15,7 @@ const createSaleSchema = z.object({
     )
     .min(1),
   paymentStatus: z.enum(["PAID", "UNPAID", "PARTIAL"]).default("PAID"),
+  amountPaid: z.number().nonnegative().optional(),
   paymentMethod: z.enum(["CASH", "CARD", "UPI"]).optional(),
   notes: z.string().optional(),
   referenceId: z.string().optional(),
@@ -54,6 +55,29 @@ export const transactionRouter = router({
         }
       })
 
+      // Backend Validations for Payment Statuses
+      if (input.paymentStatus === "PARTIAL") {
+        if (input.amountPaid === undefined) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Amount paid is required for partial payments.",
+          })
+        }
+        if (input.amountPaid >= totalAmount) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Amount paid for a partial payment must be less than the total sale amount.",
+          })
+        }
+      }
+
+      if ((input.paymentStatus === "UNPAID" || input.paymentStatus === "PARTIAL") && !input.customerId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "A customer must be selected to record an unpaid or partial sale.",
+        })
+      }
+
       await ctx.db.transaction(async (tx) => {
         // Create Transaction
         const [newTx] = await tx
@@ -64,6 +88,9 @@ export const transactionRouter = router({
             type: "SALE",
             totalAmount: totalAmount.toString(),
             profit: totalProfit.toString(),
+            amountPaid: input.amountPaid !== undefined
+              ? input.amountPaid.toString()
+              : (input.paymentStatus === "PAID" ? totalAmount.toString() : "0.00"),
             paymentStatus: input.paymentStatus,
             paymentMethod: input.paymentMethod,
             notes: input.notes,
@@ -98,12 +125,16 @@ export const transactionRouter = router({
             .where(eq(product.id, item.productId))
         }
 
-        // Update Customer Credit if unpaid
-        if (input.paymentStatus === "UNPAID" && input.customerId) {
+        // Update Customer Credit if unpaid or partial
+        if (input.customerId && (input.paymentStatus === "UNPAID" || input.paymentStatus === "PARTIAL")) {
+          const debtAmount = input.paymentStatus === "UNPAID"
+            ? totalAmount
+            : totalAmount - (input.amountPaid || 0);
+
           await tx
             .update(customer)
             .set({
-              storeCredit: sql`${customer.storeCredit} - ${totalAmount}`,
+              storeCredit: sql`${customer.storeCredit} - ${debtAmount}`,
               updatedAt: sql`CURRENT_TIMESTAMP`,
             })
             .where(eq(customer.id, input.customerId))
