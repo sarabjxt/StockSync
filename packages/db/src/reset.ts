@@ -10,7 +10,6 @@ async function main() {
   console.log("🧨 Dropping all tables and resetting database...")
 
   try {
-    // CASCADE ensures it deletes all tables and their foreign key relationships
     await db.execute(sql`DROP SCHEMA public CASCADE;`)
     await db.execute(sql`CREATE SCHEMA public;`)
 
