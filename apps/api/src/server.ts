@@ -13,6 +13,7 @@ const server = Fastify({
     maxParamLength: 5000,
   },
   logger: true,
+  trustProxy: true,
 })
 
 async function start() {
@@ -30,7 +31,7 @@ async function start() {
 
     server.all("/api/auth/*", async (request, reply) => {
       try {
-        const url = new URL(request.url, `http://${request.headers.host}`)
+        const url = new URL(request.url, `${request.protocol}://${request.headers.host}`)
 
         const headers = fromNodeHeaders(request.headers)
 
@@ -39,11 +40,21 @@ async function start() {
           headers,
           ...(request.body ? { body: JSON.stringify(request.body) } : {}),
         })
-        // Process authentication request
+
         const response = await auth.handler(req)
-        // Forward response to client
+
         reply.status(response.status)
-        response.headers.forEach((value, key) => reply.header(key, value))
+        const omittedHeaders = [
+          "access-control-allow-origin",
+          "access-control-allow-credentials",
+          "access-control-allow-methods",
+          "access-control-allow-headers",
+        ]
+        response.headers.forEach((value, key) => {
+          if (!omittedHeaders.includes(key.toLowerCase())) {
+            reply.header(key, value)
+          }
+        })
         return reply.send(response.body ? await response.text() : null)
       } catch (error: any) {
         server.log.error("Authentication Error:", error)
