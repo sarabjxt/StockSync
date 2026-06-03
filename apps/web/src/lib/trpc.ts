@@ -16,10 +16,22 @@ export const queryClient = new QueryClient({
   },
 })
 
+const getApiUrl = () => {
+  const envUrl =
+    (typeof process !== "undefined" ? process.env.VITE_API_URL : undefined) ||
+    import.meta.env.VITE_API_URL
+
+  if (envUrl) {
+    return envUrl.endsWith("/api/") ? envUrl : `${envUrl.replace(/\/$/, "")}/api/`
+  }
+
+  return "http://localhost:8000/api/"
+}
+
 const trpcClient = createTRPCClient<AppRouter>({
   links: [
     httpBatchLink({
-      url: "http://localhost:8000/api/",
+      url: getApiUrl(),
       fetch(url, options) {
         return fetch(url, {
           ...options,
