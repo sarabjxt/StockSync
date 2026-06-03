@@ -6,7 +6,7 @@ import { useForm } from "@tanstack/react-form"
 import { toast } from "sonner"
 import * as z from "zod"
 
-import { authClient } from "@stocksync/auth/client"
+import { authClient } from "@/lib/auth"
 import {
   Card,
   CardContent,

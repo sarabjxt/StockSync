@@ -6,7 +6,7 @@ import * as z from "zod"
 import { format } from "date-fns"
 import { Calendar, Check, Copy, Fingerprint, Mail, User } from "lucide-react"
 
-import { authClient } from "@stocksync/auth/client"
+import { authClient } from "@/lib/auth"
 import {
   Card,
   CardContent,

@@ -22,6 +22,7 @@
     "@stocksync/auth": "workspace:*",
     "@stocksync/trpc": "workspace:*",
     "@tailwindcss/vite": "^4.2.1",
+    "better-auth": "^1.6.9",
     "@tanstack/react-devtools": "^0.10.0",
     "@tanstack/react-form": "^1.29.1",
     "@tanstack/react-form-start": "^1.29.1",

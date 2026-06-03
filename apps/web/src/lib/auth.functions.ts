@@ -1,8 +1,8 @@
 import { redirect } from "@tanstack/react-router"
 import { createServerFn } from "@tanstack/react-start"
 import { getRequestHeader } from "@tanstack/react-start/server"
-import { authClient } from "@stocksync/auth/client"
 import { toast } from "sonner"
+import { authClient } from "@/lib/auth"
 
 export const getSession = createServerFn({ method: "GET" }).handler(
   async () => {
