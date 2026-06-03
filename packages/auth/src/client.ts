@@ -4,10 +4,12 @@ import { createAuthClient } from "better-auth/react"
 function getBaseUrl() {
   const envUrl =
     (typeof process !== "undefined"
-      ? process.env.VITE_BETTER_AUTH_URL
+      ? process.env.VITE_BETTER_AUTH_URL || process.env.VITE_API_URL
       : undefined) ||
     // @ts-ignore - this will run fine in vite
-    (import.meta as any).env?.VITE_BETTER_AUTH_URL
+    (import.meta as any).env?.VITE_BETTER_AUTH_URL ||
+    // @ts-ignore - this will run fine in vite
+    (import.meta as any).env?.VITE_API_URL
 
   return envUrl || "http://localhost:8000"
 }
