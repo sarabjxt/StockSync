@@ -2,16 +2,22 @@ import { emailOTPClient } from "better-auth/client/plugins"
 import { createAuthClient } from "better-auth/react"
 
 function getBaseUrl() {
-  const envUrl =
-    (typeof process !== "undefined"
-      ? process.env.VITE_BETTER_AUTH_URL || process.env.VITE_API_URL
-      : undefined) ||
-    // @ts-ignore - this will run fine in vite
-    (import.meta as any).env?.VITE_BETTER_AUTH_URL ||
-    // @ts-ignore - this will run fine in vite
-    (import.meta as any).env?.VITE_API_URL
+  if (typeof process !== "undefined" && process.env) {
+    const envUrl =
+      process.env.VITE_BETTER_AUTH_URL ||
+      process.env.VITE_API_URL ||
+      process.env.BETTER_AUTH_URL
+    if (envUrl) return envUrl
+  }
 
-  return envUrl || "http://localhost:8000"
+  // @ts-ignore
+  if (typeof import.meta !== "undefined" && import.meta.env) {
+    // @ts-ignore
+    const envUrl = import.meta.env.VITE_BETTER_AUTH_URL || import.meta.env.VITE_API_URL
+    if (envUrl) return envUrl
+  }
+
+  return "http://localhost:8000"
 }
 
 export const authClient = createAuthClient({
