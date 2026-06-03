@@ -61,8 +61,8 @@ function RouteComponent() {
             The dashboard built for hyper-local merchants.
           </h1>
           <p className="mt-4 text-primary-foreground/80 max-w-md">
-            Track stock, log WhatsApp orders, see your real margins, and run
-            local deliveries — all from one clean screen.
+            Track stock levels, log sales, manage customer credit ledgers, and
+            monitor real-time business performance — all from one clean screen.
           </p>
         </div>
         <div className="text-sm text-primary-foreground/70">© StockSync</div>
