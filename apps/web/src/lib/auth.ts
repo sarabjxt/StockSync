@@ -11,7 +11,16 @@ function getBaseUrl() {
     import.meta.env.VITE_BETTER_AUTH_URL ||
     import.meta.env.VITE_API_URL
 
-  return envUrl || "http://localhost:8000"
+  if (envUrl) {
+    return envUrl
+  }
+
+  // Ultimate fallback if env vars fail to load in production (e.g. Vercel config issues)
+  if (typeof window !== "undefined" && window.location.hostname !== "localhost") {
+    return "https://stocksync-api.onrender.com"
+  }
+
+  return "http://localhost:8000"
 }
 
 export const authClient = createAuthClient({

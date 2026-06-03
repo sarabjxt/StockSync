@@ -16,13 +16,20 @@ export const queryClient = new QueryClient({
   },
 })
 
-const getApiUrl = () => {
+function getApiUrl() {
   const envUrl =
-    (typeof process !== "undefined" ? process.env.VITE_API_URL : undefined) ||
+    (typeof process !== "undefined"
+      ? process.env.VITE_API_URL || process.env.API_URL
+      : undefined) ||
     import.meta.env.VITE_API_URL
 
   if (envUrl) {
     return envUrl.endsWith("/api/") ? envUrl : `${envUrl.replace(/\/$/, "")}/api/`
+  }
+
+  // Ultimate fallback if env vars fail to load in production (e.g. Vercel config issues)
+  if (typeof window !== "undefined" && window.location.hostname !== "localhost") {
+    return "https://stocksync-api.onrender.com/api/"
   }
 
   return "http://localhost:8000/api/"
