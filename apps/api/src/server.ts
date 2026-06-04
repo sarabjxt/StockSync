@@ -13,28 +13,34 @@ const server = Fastify({
     maxParamLength: 5000,
   },
   logger: true,
-  trustProxy: true,
 })
 
 async function start() {
   try {
-    // Register CORS (Security)
     await server.register(cors, {
       origin: env.FRONTEND_URL,
+      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+      allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
       credentials: true,
+      maxAge: 86400,
     })
 
-    // Standard REST Route (Health Check)
     server.get("/health", async () => {
       return { status: "ok", uptime: process.uptime() }
     })
 
     server.all("/api/auth/*", async (request, reply) => {
       try {
-        const url = new URL(request.url, `${request.protocol}://${request.headers.host}`)
+        // Construct request URL
+        const url = new URL(
+          request.url,
+          `${request.protocol}://${request.headers.host}`
+        )
 
+        // Convert Fastify headers to standard Headers object
         const headers = fromNodeHeaders(request.headers)
 
+        // Create Fetch API-compatible request
         const req = new Request(url.toString(), {
           method: request.method,
           headers,
@@ -44,17 +50,7 @@ async function start() {
         const response = await auth.handler(req)
 
         reply.status(response.status)
-        const omittedHeaders = [
-          "access-control-allow-origin",
-          "access-control-allow-credentials",
-          "access-control-allow-methods",
-          "access-control-allow-headers",
-        ]
-        response.headers.forEach((value, key) => {
-          if (!omittedHeaders.includes(key.toLowerCase())) {
-            reply.header(key, value)
-          }
-        })
+        response.headers.forEach((value, key) => reply.header(key, value))
         return reply.send(response.body ? await response.text() : null)
       } catch (error: any) {
         server.log.error("Authentication Error:", error)
