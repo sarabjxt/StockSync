@@ -20,7 +20,7 @@ function getBaseUrl() {
     typeof window !== "undefined" &&
     window.location.hostname !== "localhost"
   ) {
-    return "https://stocksync-api-v331.onrender.com"
+    return "https://stocksync-api.sarabjxt.in"
   }
 
   return "http://localhost:8000"

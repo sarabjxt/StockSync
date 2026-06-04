@@ -13,7 +13,8 @@ function getBaseUrl() {
   // @ts-ignore
   if (typeof import.meta !== "undefined" && import.meta.env) {
     // @ts-ignore
-    const envUrl = import.meta.env.VITE_BETTER_AUTH_URL || import.meta.env.VITE_API_URL
+    const envUrl =
+      import.meta.env.VITE_BETTER_AUTH_URL || import.meta.env.VITE_API_URL
     if (envUrl) return envUrl
   }
 
