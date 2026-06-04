@@ -1,6 +1,7 @@
 import { APIError, betterAuth } from "better-auth"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
 import { emailOTP } from "better-auth/plugins"
+import { tanstackStartCookies } from "better-auth/tanstack-start"
 import { db } from "@stocksync/db"
 import { sendOTPEmail } from "@stocksync/transactional"
 import { env } from "./env"
@@ -40,6 +41,7 @@ export const auth = betterAuth({
         }
       },
     }),
+    tanstackStartCookies(),
   ],
   secret: env.BETTER_AUTH_SECRET,
   url: env.BETTER_AUTH_URL,
