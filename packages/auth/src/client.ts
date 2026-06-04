@@ -23,6 +23,9 @@ function getBaseUrl() {
 export const authClient = createAuthClient({
   plugins: [emailOTPClient()],
   baseURL: getBaseUrl(),
+  fetchOptions: {
+    credentials: "include",
+  },
 })
 
 export type Session = typeof authClient.$Infer.Session
