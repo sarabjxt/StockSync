@@ -16,8 +16,11 @@ function getBaseUrl() {
   }
 
   // Ultimate fallback if env vars fail to load in production (e.g. Vercel config issues)
-  if (typeof window !== "undefined" && window.location.hostname !== "localhost") {
-    return "https://stocksync-api.onrender.com"
+  if (
+    typeof window !== "undefined" &&
+    window.location.hostname !== "localhost"
+  ) {
+    return "https://stocksync-api-v331.onrender.com"
   }
 
   return "http://localhost:8000"
