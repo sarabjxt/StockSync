@@ -10,7 +10,13 @@ export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: "pg",
   }),
-  trustedOrigins: [env.FRONTEND_URL],
+  advanced: {
+    crossSubDomainCookies: {
+      enabled: true,
+      domain: env.ROOT_DOMAIN_URL,
+    },
+  },
+  trustedOrigins: [env.FRONTEND_URL, env.BACKEND_URL],
   emailAndPassword: {
     enabled: true,
   },
@@ -44,7 +50,7 @@ export const auth = betterAuth({
     tanstackStartCookies(),
   ],
   secret: env.BETTER_AUTH_SECRET,
-  url: env.BETTER_AUTH_URL,
+  url: env.BACKEND_URL,
 })
 
 export type Session = typeof auth.$Infer.Session
