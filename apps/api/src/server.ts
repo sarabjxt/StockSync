@@ -1,5 +1,6 @@
 import Fastify from "fastify"
 import cors from "@fastify/cors"
+import cookie from "@fastify/cookie"
 import { fastifyTRPCPlugin } from "@trpc/server/adapters/fastify"
 import { fromNodeHeaders } from "better-auth/node"
 
@@ -24,6 +25,8 @@ async function start() {
       credentials: true,
       maxAge: 86400,
     })
+
+    await server.register(cookie)
 
     server.get("/health", async () => {
       return { status: "ok", uptime: process.uptime() }
