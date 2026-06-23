@@ -1,4 +1,7 @@
 import { LogOutIcon, Moon, Sun } from "lucide-react"
+import { useNavigate } from "@tanstack/react-router"
+import { toast } from "sonner"
+import { useState } from "react"
 import type { Session } from "@stocksync/auth/client"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
@@ -7,11 +10,34 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import { ThemeToggle } from "@/components/theme-toggle"
-import { logout } from "@/lib/auth.functions"
+import { authClient } from "@/lib/auth"
+import { Spinner } from "@/components/ui/spinner"
 
 export function NavUser({ user }: { user: Session["user"] }) {
   const userNameFallback =
     user.name[0] + user.name.slice(user.name.indexOf(" ") + 1)[0]
+
+  const navigate = useNavigate()
+
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+
+  async function handleLogout() {
+    try {
+      setIsLoggingOut(true)
+      await authClient.signOut()
+      navigate({
+        to: "/login",
+      })
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "An error occurred while logging out. Please try again."
+      toast.error(message)
+    } finally {
+      setIsLoggingOut(false)
+    }
+  }
   return (
     <SidebarMenu className="bg-card border p-4 rounded-xl">
       <SidebarMenuItem className="mb-2">
@@ -40,8 +66,8 @@ export function NavUser({ user }: { user: Session["user"] }) {
         />
       </SidebarMenuItem>
       <SidebarMenuItem>
-        <SidebarMenuButton onClick={logout}>
-          <LogOutIcon />
+        <SidebarMenuButton onClick={handleLogout} disabled={isLoggingOut}>
+          {isLoggingOut ? <Spinner /> : <LogOutIcon />}
           Logout
         </SidebarMenuButton>
       </SidebarMenuItem>
