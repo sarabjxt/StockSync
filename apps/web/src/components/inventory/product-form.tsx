@@ -190,22 +190,20 @@ export function ProductForm({
                       )}
                     </ComboboxList>
                     <Separator />
-                    {items.length !== 0 && (
-                      <div className="w-full flex flex-col justify-center p-2">
-                        <CategoryDialogTrigger
-                          render={
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="w-full"
-                            >
-                              <Plus />
-                              Create Category
-                            </Button>
-                          }
-                        />
-                      </div>
-                    )}
+                    <div className="w-full flex flex-col justify-center p-2">
+                      <CategoryDialogTrigger
+                        render={
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                          >
+                            <Plus />
+                            Create Category
+                          </Button>
+                        }
+                      />
+                    </div>
                   </ComboboxContent>
                 </Combobox>
                 {isInvalid && <FieldError errors={field.state.meta.errors} />}
