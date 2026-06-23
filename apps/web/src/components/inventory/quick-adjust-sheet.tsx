@@ -295,6 +295,7 @@ function QuickAdjustSheetImpl({
 
                 form.handleSubmit()
               }}
+              className="overflow-y-scroll"
             >
               <div className="space-y-5 px-4">
                 <div className="space-y-5">
